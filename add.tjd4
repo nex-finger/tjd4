@@ -7,6 +7,7 @@
 0x02    STA, 1
 0x03    STA, 2
 0x04    STA, 3
+0x05    NOP
 ;1stInput
 0x10    IMX, 1
 0x11    IMY, 6
