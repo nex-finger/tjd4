@@ -1,0 +1,9 @@
+;test program 01
+;simple jump
+
+0x03 IMX, 6
+0x04 IMY, 9
+0x05 JMP
+0x69 IMX, 0
+0x6a IMY, 3
+0x6b JMP
