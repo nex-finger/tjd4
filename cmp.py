@@ -4,49 +4,50 @@
 
 import os
 import re
+import csv
 
-#アセンブリの正規表現
-ASM = [
-    "^\s*0x[0123456789abcdef]{2}\s+LDA,\s*A", "^\s*0x[0123456789abcdef]{2}\s+LDA,\s*B", "^\s*0x[0123456789abcdef]{2}\s+LDA,\s*X", "^\s*0x[0123456789abcdef]{2}\s+LDA,\s*Y",
-    "^\s*0x[0123456789abcdef]{2}\s+LDB,\s*A", "^\s*0x[0123456789abcdef]{2}\s+LDB,\s*B", "^\s*0x[0123456789abcdef]{2}\s+LDB,\s*X", "^\s*0x[0123456789abcdef]{2}\s+LDB,\s*Y",
-    "^\s*0x[0123456789abcdef]{2}\s+LDX,\s*A", "^\s*0x[0123456789abcdef]{2}\s+LDX,\s*B", "^\s*0x[0123456789abcdef]{2}\s+LDX,\s*X", "^\s*0x[0123456789abcdef]{2}\s+LDX,\s*Y",
-    "^\s*0x[0123456789abcdef]{2}\s+LDY,\s*A", "^\s*0x[0123456789abcdef]{2}\s+LDY,\s*B", "^\s*0x[0123456789abcdef]{2}\s+LDY,\s*X", "^\s*0x[0123456789abcdef]{2}\s+LDY,\s*Y",
-    "^\s*0x[0123456789abcdef]{2}\s+IMA,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+IMB,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+IMX,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+IMY,\s*[0123456789abcdef]",
-    "^\s*0x[0123456789abcdef]{2}\s+ABA,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+ABB,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+ABX,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+ABY,\s*[0123456789abcdef]",
-    "^\s*0x[0123456789abcdef]{2}\s+INA", "^\s*0x[0123456789abcdef]{2}\s+INB", "^\s*0x[0123456789abcdef]{2}\s+INX", "^\s*0x[0123456789abcdef]{2}\s+INY",
-    "^\s*0x[0123456789abcdef]{2}\s+STA,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+STB,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+STX,\s*[0123456789abcdef]", "^\s*0x[0123456789abcdef]{2}\s+STY,\s*[0123456789abcdef]",
-    "^\s*0x[0123456789abcdef]{2}\s+ADD", "^\s*0x[0123456789abcdef]{2}\s+SUB", "^\s*0x[0123456789abcdef]{2}\s+ORA", "^\s*0x[0123456789abcdef]{2}\s+AND",
-    "^\s*0x[0123456789abcdef]{2}\s+ROR", "^\s*0x[0123456789abcdef]{2}\s+ROL", "^\s*0x[0123456789abcdef]{2}\s+TRA", "^\s*0x[0123456789abcdef]{2}\s+TRB",
-    "^\s*0x[0123456789abcdef]{2}\s+JMP", "^\s*0x[0123456789abcdef]{2}\s+JCA", "^\s*0x[0123456789abcdef]{2}\s+JEQ", "^\s*0x[0123456789abcdef]{2}\s+JCM", "^\s*0x[0123456789abcdef]{2}\s+JIN",
-    "^\s*0x[0123456789abcdef]{2}\s+NOP"
-]
+#アセンブリの正規表現と対応表のアドレス
+ASM = []
+BIN = []
+RAN = []
+TABLE_ADRS = "table.txt"
 
-#アセンブリに対応する機械語
-BIN = [
-    0b100000, 0b100001, 0b100010, 0b100011, 0b100100, 0b100101, 0b100110, 0b100111, 0b101000, 0b101001, 0b101010, 0b101011, 0b101100, 0b101101, 0b101110, 0b101111,
-    0b110000, 0b110001, 0b110010, 0b110011, 0b110100, 0b110101, 0b110110, 0b110111, 0b111000, 0b111001, 0b111010, 0b111011, 0b011000, 0b011001, 0b011010, 0b011011,
-    0b010000, 0b010001, 0b010010, 0b010011, 0b010100, 0b010101, 0b010110, 0b010111, 0b001000, 0b001100, 0b001101, 0b001110, 0b001111, 0b100000
-]
-
-#オペランドの有無
-RAN = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-]
+#アセンブリ対応表の読み込み
+def import_table(_adrs):
+    _f = open(_adrs, "r")
+    _table = _f.readlines()
+    for i in range(len(_table)):
+        _t0 = _table[i].replace("\n", "")
+        _t1 = " ".join(_t0.split())
+        _t2 = _t1.split()
+        ASM.append(_t2[0])
+        BIN.append(int(_t2[1], 0))
+        RAN.append(int(_t2[2]))
 
 #ファイルの読み込み
 def import_file():
     _pwd = os.getcwd()
-    _dir = os.listdir(_pwd)
-    
-    print("Directory :", _pwd)
-    print("File list :", "  ".join(_dir))
+    os.chdir(_pwd + "/source")
+    print("Directory :", os.getcwd())
+
+    _iext  = input("Extension? (t/c)  : ")
     _ipass = input("Source file name? : ")
     _epass = input("Export file name? : ")
-    _f = open(_ipass + ".tjd4", "r")
-    _text_list = _f.readlines()
-    _f.close()
+
+    if(_iext == "t"):
+        _f = open(_ipass + ".tjd4", "r")
+        _text_list = _f.readlines()
+        _f.close()
+    if(_iext == "c"):
+        with open(_ipass + ".csv", "r") as f:
+            _r = csv.reader(f)
+            _l = [row for row in _r]
+        _text_list = []
+        for i in range(len(_l)):
+            _t = " ".join(_l[i])
+            _text_list.append(_t)
+        f.close()
+
     return _text_list, _epass
 
 #テキストが，命令かコメントかを判定する
@@ -131,6 +132,7 @@ def dump_assembly(_code, _rand, _asm):
 
 #ファイル書き込み
 def create_file(_code, _rand, _asm, _pass):
+    os.chdir("../output")
     _teasm = ["" for mi in range(259)] 
     _teasm[0] = _pass + ".txt"
     _teasm[1] = "adrs    code    asm"
@@ -163,24 +165,55 @@ def create_file(_code, _rand, _asm, _pass):
             _r = str(_rand[i*16+j])
             _temcn[i+2] += "0x" + _c + _r + ", "
     _emcn = "\n".join(_temcn)
-    return _easm, _emcn, _usage
+
+    _tecsv = ["" for mi in range(259)] 
+    _tecsv[0] = _pass + ".csv"
+    _tecsv[1] = "adrs,code,asm"
+    for i in range(256):
+        _i = "0x" + str(hex(i).replace("0x", "")).zfill(2)
+        _c = str(hex(_code[i])).replace("0x", "").zfill(2)
+        _r = str(_rand[i])
+        _a = _asm[i]
+        _cr = _c + _r
+        if(_a == "NOP"):
+            _teasm[i+2] = _i
+        else:
+            _tecsv[i+2] = _i + "," + _cr + "," + _a
+    _ecsv = "\n".join(_tecsv)
+
+    return _easm, _emcn, _ecsv, _usage
 
 #ファイルの書き出し
-def export_file(_asm, _code, _usage, _pass):
-    with open(_pass + ".txt", "w", encoding = "utf-8") as f:
-        f.write(_asm)
-        f.close()
-    with open(_pass + ".dat", "w", encoding = "utf-8") as f:
-        f.write(_code)
-        f.close()
+def export_file(_asm, _code, _csv, _usage, _pass):
+    _a = input("Export txt file? (y/n) : ")
+    _d = input("Export dat file? (y/n) : ")
+    _c = input("Export csv file? (y/n) : ")
 
-    _asm_size = round((os.path.getsize(_pass + ".txt") / 1000), 1)
-    _code_size = round((os.path.getsize(_pass + ".dat") / 1000), 1)
-    _usage_rate = round(100 * _usage / 256)
+    if(_a == "Y" or _a == "y"):
+        with open(_pass + ".txt", "w", encoding = "utf-8") as f:
+            f.write(_asm)
+            f.close()
+        _asm_size = round((os.path.getsize(_pass + ".txt") / 1000), 1)
+        print("asm file size : " + str(_asm_size) + "KB")
+
+    if(_d == "Y" or _d == "y"):
+        with open(_pass + ".dat", "w", encoding = "utf-8") as f:
+            f.write(_code)
+            f.close()
+        _code_size = round((os.path.getsize(_pass + ".dat") / 1000), 1)
+        print("dat file size : " + str(_code_size) + "KB")
+
+    if(_c == "Y" or _c == "y"):
+        with open(_pass + ".csv", "w", encoding = "utf-8") as f:
+            f.write(_csv)
+            f.close()
+        _csv_size = round((os.path.getsize(_pass + ".csv") / 1000), 1)    
+        print("csv file size : " + str(_csv_size) + "KB")
+    
     print("\nSaved.")
+
+    _usage_rate = round(100 * _usage / 256)
     print("Data usage    : " + str(_usage) + " / 256words (" + str(_usage_rate) + "%)")
-    print("asm file size : " + str(_asm_size) + "KB")
-    print("dat file size : " + str(_code_size) + "KB")
 
 #テキストが誤っている場合の警告，プログラムの終了
 def syntax_error(_i, _t):
@@ -188,6 +221,7 @@ def syntax_error(_i, _t):
     print("error text : ", _t)
 
 #メイン関数ここから
+import_table(TABLE_ADRS)
 assembly_text_list, epass = import_file()
 
 list_length = len(assembly_text_list)
@@ -208,5 +242,5 @@ for i in range(list_length):
         syntax_error(i, assembly_text_list[i])
 
 dump_assembly(data_c, data_r, data_a)
-asm_text, code_text, usage = create_file(data_c, data_r, data_a, epass)
-export_file(asm_text, code_text, usage, epass)
+asm_text, code_text, csv_text, usage = create_file(data_c, data_r, data_a, epass)
+export_file(asm_text, code_text, csv_text, usage, epass)
